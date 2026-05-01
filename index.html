@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CLVCZGSG2M"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-CLVCZGSG2M');
+    </script>
+    <title>リアルタイム潮位(関東甲信越)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <style>
+        @font-face {
+            font-family: 'UD-ShinGo-DeBold';
+            src: url('A-OTF UD新ゴ Pr6N-DeBold.otf') format('opentype');
+        }
+
+        @font-face {
+            font-family: 'BIZUDPGothic-Bold';
+            src: url('BIZUDPGothic-Bold.ttf') format('truetype');
+        }
+
+        * { box-sizing: border-box; }
+        
+        body { 
+            background-color: #01162a; 
+            cursor: url('c1.png') 5 2, auto;
+            margin: 0; 
+            color: white; 
+            font-family: 'UD-ShinGo-DeBold', 'BIZUDPGothic-Bold', sans-serif; 
+            overflow-y: scroll; 
+        }
+        .grid-container { display: grid; grid-template-columns: repeat(4, 1fr); width: 90%; margin: 40px auto; gap: 7px 10px; }
+        
+        .graph-box { 
+            position: relative; 
+            width: 100%; 
+            aspect-ratio: 16 / 9; 
+            background-color: #0f2742; 
+            overflow: hidden; 
+            cursor: url('c2.png') 9 2, auto;
+            z-index: 1;
+            border: none;
+            outline: 5px solid transparent; 
+            outline-offset: -5px;
+        }
+
+        .graph-box:not(.expanded):hover {
+            outline: 5px solid #ffffff; 
+            cursor: url('c2.png') 5 2, auto;
+            transition: none !important; 
+        }
+
+        .graph-box:not(.expanded) {
+            transition: none !important; 
+        }
+        .graph-box.image-box:hover { 
+            outline-color: transparent !important; 
+            cursor: url('./c1.png') 5 2, auto !important;
+        }
+
+        .custom-tooltip {
+            position: absolute;
+            background-color: rgba(243, 243, 243, 0.9); 
+            color: #1e2d32;
+            padding: 0;
+            border-radius: 0;
+            z-index: 9999;
+            font-family: 'UD-ShinGo-DeBold', sans-serif;
+            white-space: nowrap; 
+            outline: 7px solid #1e2d32;
+            transform-origin: top left;
+            overflow: visible;
+
+            pointer-events: none !important; 
+            opacity: 0;
+            visibility: hidden;
+            display: block !important; 
+            transition: opacity 0.2s ease-out;
+        }
+
+        .custom-tooltip.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .tooltip-time {
+            background-color: #1e2d32;
+            color: white;
+            font-size: 85px;
+            font-weight: normal;
+            padding: 15px 30px;
+            margin: 0;
+            text-align: left;
+            line-height: 1.2;
+            
+            border: none;
+            outline: none;
+            display: block;
+            margin-bottom: -1px; 
+        }
+
+        .tooltip-row {
+            display: flex;
+            align-items: center;
+            font-size: 58px;
+            padding: 20px 25px 0px 25px;
+            background-color: #f3f3f3; 
+        }
+
+        .tooltip-color-box {
+            width: 52px; 
+            height: 52px;
+            margin-right: 18px; 
+            flex-shrink: 0;
+            box-sizing: border-box; 
+        }
+        .tooltip-color-box.dashed {
+            background-color: transparent !important; 
+            border: 6px dashed #b103e1; 
+        }
+
+        .custom-tooltip {
+            position: absolute;
+            background-color: rgba(243, 243, 243, 0.9); 
+            color: #1e2d32;
+            padding: 0;
+            border-radius: 0;
+            pointer-events: none;
+            z-index: 9999;
+            display: none;
+            font-family: 'UD-ShinGo-DeBold', sans-serif;
+            outline: 7px solid #1e2d32;
+            outline-offset: -1px; 
+            transform-origin: top left;
+            overflow: visible;
+        }
+        .custom-tooltip::after {
+            content: "";
+            position: absolute;
+            left: -76px; 
+            top: 50%;
+            transform: translateY(-50%);
+            
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 28px 71px 28px 0; 
+            border-color: transparent #1e2d32 transparent transparent;
+            z-index: -1; 
+        }
+
+        .custom-tooltip::before {
+            content: "";
+            position: absolute;
+            left: -61px; 
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 20px 55px 20px 0; 
+            border-color: transparent rgba(243, 243, 243, 0.85) transparent transparent;
+            z-index: 1;
+        }
+        .tooltip-time, .tooltip-row, .tooltip-value-container {
+            line-height: 1.2; 
+        }
+        .tooltip-time {
+            background-color: #1e2d32;
+            color: white;
+            font-size: 80px;
+            padding: 15px 30px;
+            text-align: left;
+            border: none;
+        }
+        .tooltip-row, 
+        .tooltip-value-container {
+            display: flex;
+            align-items: center;
+            background-color: transparent !important; 
+            border: none;
+        }
+
+        .tooltip-row {
+            display: flex;
+            align-items: center;
+            font-size: 60px;
+            padding: 0px 30px 0 30px; 
+            background-color: transparent;
+            border: none; 
+        }
+
+        .tooltip-value-container {
+            text-align: right;
+            background-color: transparent;
+            padding: 0 200px 30px 0px; 
+            margin-top: -15px;
+            border: none; 
+        }
+        .tooltip-time {
+            font-size: 40px;
+            margin-bottom: 35px;
+            padding-bottom: 15px;
+            text-align: left;
+            border: none; 
+        }
+
+        .tooltip-row {
+            display: flex;
+            align-items: center;
+            font-size: 50px;
+            margin: 5px 0;
+            border: none; 
+        }
+
+        .tooltip-color-box {
+            width: 40px;
+            height: 40px;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .tooltip-value {
+            margin-left: auto;
+            font-size: 80px;
+            font-weight: 900;
+        }
+        .tooltip-unit {
+            font-size: 50px;
+            margin-left: 5px;
+        }
+
+        .graph-box.expanded {
+            position: fixed;
+            z-index: 2000;
+            outline-color: transparent !important; 
+            background-color: #0f2742;
+            cursor: url('c1.png') 5 2, auto;
+            will-change: top, left, width, height;
+        }
+
+        .placeholder { 
+            width: 100%; 
+            aspect-ratio: 16 / 9; 
+            visibility: hidden;
+        }
+
+        .scaling-layer { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 3840px; height: 2160px; 
+            transform-origin: 0 0; 
+            pointer-events: auto; 
+            z-index: 10; 
+            transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1); 
+        }
+
+        .station-label, .agency-label, .legend-box {
+            pointer-events: none;
+        }
+        
+        .station-label { position: absolute; top: 120px; width: 100%; text-align: center; font-size: 154px; font-weight: 900; white-space: nowrap; line-height: 1; }
+        .station-label::after { content: " 潮位"; }
+
+        .agency-label { 
+            position: absolute; 
+            top: 1975px; 
+            right: 250px; 
+            font-size: 65px; 
+            font-weight: 500; 
+            color: #aaaaaa; 
+            text-align: right;
+            z-index: 30; 
+            pointer-events: none;
+            line-height: 1;
+        }
+        
+        .chart-layer { 
+            position: absolute; 
+            top: 418px; 
+            left: 180px; 
+            width: 3480px; 
+            height: 1400px; 
+        }
+        
+        canvas { 
+            display: block;
+            width: 100%; 
+            height: 100%; 
+        }
+        
+        .legend-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            z-index: 20;
+            opacity: 1;
+        }
+        .legend-box img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .image-box img { width: 100%; height: 100%; object-fit: contain; }
+
+        #scrim {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+<!-- IDを JavaScript側の 'tohoku-grid' に合わせる -->
+<div class="grid-container" id="tohoku-grid">
+    <div class="graph-box image-box" id="map-card">
+        <!-- 必要に応じて東北の地図画像に変更してください -->
+        <img src="hokuriku1.png" alt="東北広域図" onerror="this.style.display='none'">
+    </div>
+</div>
+
+<div id="scrim" onclick="closeExpanded()"></div>
+
+<div id="scrim" onclick="closeExpanded()"></div>
+
+<script>
+    const CONFIG = {
+        marginRatio: 0.90   ,
+        aspectRatio: 16/9,
+        animDuration: 1000,
+        fontName: "'UD-ShinGo-DeBold', 'BIZUDPGothic-Bold', sans-serif"
+    };
+
+    const targetStationNames = ["青森", "青森港", "八戸港", "下北", "深浦", "竜飛", "むつ小川原", "秋田", "宮古", "大船渡", "釜石", "久慈", "石巻", "仙台新港", "鮎川", "酒田", "小名浜"];
+    let expandedElement = null;
+    let placeholderElement = null;
+
+    function updateScales() {
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.graph-box').forEach(box => {
+                if (!box.classList.contains('expanded')) {
+                    const scale = box.offsetWidth / 3840;
+                    const layer = box.querySelector('.scaling-layer');
+                    if (layer) {
+                        layer.style.transform = `scale(${scale})`;
+                    }
+                } else if (expandedElement) {
+                    const finalWidth = CONFIG.fixedWidth;
+                    const viewportWidth = document.documentElement.clientWidth;
+                    const viewportHeight = window.innerHeight;
+                    const finalHeight = finalWidth / CONFIG.aspectRatio;
+                    
+                    expandedElement.style.top = (viewportHeight - finalHeight) / 2 + 'px';
+                    expandedElement.style.left = (viewportWidth - finalWidth) / 2 + 'px';
+                    
+                    const layer = expandedElement.querySelector('.scaling-layer');
+                    if (layer) layer.style.transform = `scale(${finalWidth / 3840})`;
+                }
+            });
+        });
+    }
+
+    function handleCardClick(el) {
+        if (expandedElement || isAnimating) return;
+        expandCard(el);
+    }
+    let isAnimating = false; 
+
+    function expandCard(el) {
+        isAnimating = true;
+        expandedElement = el;
+        const scrim = document.getElementById('scrim');
+        const rect = el.getBoundingClientRect();
+        
+        placeholderElement = document.createElement('div');
+        placeholderElement.className = 'placeholder';
+        el.parentNode.insertBefore(placeholderElement, el);
+
+        const viewportWidth = document.documentElement.clientWidth;
+        const viewportHeight = window.innerHeight;
+        
+        let finalWidth = viewportWidth * CONFIG.marginRatio;
+        if (finalWidth / CONFIG.aspectRatio > viewportHeight * CONFIG.marginRatio) {
+            finalWidth = viewportHeight * CONFIG.marginRatio * CONFIG.aspectRatio;
+        }
+        const finalHeight = finalWidth / CONFIG.aspectRatio;
+
+        el.style.transition = 'none';
+        el.style.position = 'fixed';
+        el.style.top = rect.top + 'px';
+        el.style.left = rect.left + 'px';
+        el.style.width = rect.width + 'px';
+        el.style.height = rect.height + 'px';
+        el.style.margin = '0';
+        el.style.zIndex = '2000';
+
+        el.offsetHeight; 
+
+        scrim.style.display = 'block';
+        el.classList.add('expanded');
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                scrim.style.opacity = '1';
+                const duration = `${CONFIG.animDuration}ms`;
+                const easing = 'cubic-bezier(0.2, 1, 0.01, 1)';
+
+                el.style.transition = `all ${duration} ${easing}`;
+                scrim.style.transition = `opacity ${duration} ${easing}`;
+
+                const layer = el.querySelector('.scaling-layer');
+                if (layer) {
+                    layer.style.transition = `transform ${duration} ${easing}`;
+                    layer.style.transform = `scale(${finalWidth / 3840})`;
+                }
+
+                el.style.top = (viewportHeight - finalHeight) / 2 + 'px';
+                el.style.left = (viewportWidth - finalWidth) / 2 + 'px';
+                el.style.width = finalWidth + 'px';
+                el.style.height = finalHeight + 'px';
+
+                if (layer) layer.style.transform = `scale(${finalWidth / 3840})`;
+                setTimeout(() => {
+                    isAnimating = false; 
+                }, CONFIG.animDuration);
+                
+            });
+        });
+    }
+
+    function closeExpanded() {
+        if (!expandedElement || isAnimating) return;
+        isAnimating = true;
+
+        const el = expandedElement;
+        const scrim = document.getElementById('scrim');
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const rect = placeholderElement.getBoundingClientRect();
+
+        const duration = `${CONFIG.animDuration}ms`;
+        const easing = 'cubic-bezier(0.2, 1, 0.01, 1)';
+
+        el.style.transition = 'none';
+        const currentTop = parseFloat(el.style.top);
+        const currentLeft = parseFloat(el.style.left);
+
+        el.style.position = 'absolute';
+        el.style.top = (currentTop + scrollTop) + 'px';
+        el.style.left = currentLeft + 'px';
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                el.style.transition = `all ${duration} ${easing}`;
+                scrim.style.transition = `opacity ${duration} ${easing}`;
+
+                const layer = el.querySelector('.scaling-layer');
+                if (layer) {
+                    layer.style.transition = `transform ${duration} ${easing}`;
+                    layer.style.transform = `scale(${rect.width / 3840})`;
+                }
+
+                el.style.top = (rect.top + scrollTop) + 'px';
+                el.style.left = rect.left + 'px';
+                el.style.width = rect.width + 'px';
+                el.style.height = rect.height + 'px';
+
+                scrim.style.opacity = '0';
+            });
+        });
+
+        setTimeout(() => {
+            isAnimating = false;
+            el.classList.remove('expanded');
+            
+            el.style.position = '';
+            el.style.top = ''; 
+            el.style.left = ''; 
+            el.style.width = ''; 
+            el.style.height = ''; 
+            el.style.zIndex = '';
+            
+            if (placeholderElement) {
+                placeholderElement.parentNode.replaceChild(el, placeholderElement);
+                placeholderElement = null;
+            }
+            scrim.style.display = 'none';
+            expandedElement = null;
+        }, CONFIG.animDuration);
+    }
+
+    async function init() {
+        try {
+            // 気象庁のエリア情報を取得
+            const areaRes = await fetch('https://www.jma.go.jp/bosai/tidelevel/const/tide_area.json');
+            const areaData = await areaRes.json();
+            
+            let nhkNames = {};
+            try {
+                const nhkRes = await fetch('nhkname.json');
+                if (nhkRes.ok) nhkNames = await nhkRes.json();
+            } catch (e) {
+                console.warn("nhkname.jsonの取得に失敗しました。");
+            }
+
+            const grid = document.getElementById('tohoku-grid');
+            if (!grid) return;
+
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const yyyymmdd = yyyy + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+            const mmdd = String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+
+            const zureStations = ["none"]; 
+            let stationsToRender = [];
+
+            // --- 修正ポイント：北海道のエリアコード(01)を指定し、ループを正しく閉じる ---
+            const targetAreas = ['22' , '23' , '24' , 'none' , 'none']; 
+
+            for (const areaCode in areaData) {
+                // 指定したエリアコードで始まるものだけを抽出
+                if (!targetAreas.some(code => areaCode.startsWith(code))) continue;
+            
+                const area = areaData[areaCode];
+                if (!area.class30s) continue;
+            
+                for (const class30 of area.class30s) {
+                    if (!class30.stations) continue;
+            
+                    for (const found of class30.stations) {
+                        let rawAgency = found.typeName || class30.typeName || "";
+                        let agencyName = (rawAgency === "" || rawAgency === "気象庁")
+                            ? "気象庁"
+                            : `気象庁・${rawAgency}`;
+            
+                        stationsToRender.push({
+                            name: found.name,
+                            jmaCode: found.code,
+                            record: found.max?.level ?? null,
+                            advisory: class30.standard?.advisory ?? null,
+                            warning: class30.standard?.warning ?? null,
+                            agency: agencyName
+                        });
+                    }
+                }
+            }
+
+            // 重複排除とソート
+            stationsToRender = Array.from(new Map(stationsToRender.map(s => [s.jmaCode, s])).values());
+            stationsToRender.sort((a, b) => parseInt(a.jmaCode) - parseInt(b.jmaCode));
+
+            // 要素の生成
+            for (const stInfo of stationsToRender) {
+                const entry = Object.values(nhkNames).find(item => item.station_name === stInfo.name);
+                const displayName = entry ? entry.nhk_name : stInfo.name;
+
+                const box = document.createElement('div');
+                box.className = 'graph-box';
+                box.id = `container-${stInfo.jmaCode}`;
+                box.onclick = () => handleCardClick(box);
+                
+                const useZure = zureStations.includes(stInfo.name);
+                const legendHtml = useZure 
+                    ? `<img src="hanrei.png" alt="凡例"><img src="zure.png" class="zure-overlay" alt="偏差凡例" style="position: absolute; top: 0; left: 0; width: 100%; z-index: 21;">`
+                    : `<img src="hanrei.png" alt="凡例">`;
+
+                box.innerHTML = `
+                    <div class="scaling-layer">
+                        <div class="station-label">${displayName}</div>
+                        <div class="agency-label">${stInfo.agency}</div>
+                        <div class="legend-box" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; z-index: 20;">
+                            ${legendHtml}
+                        </div>
+                        <div class="chart-layer"><canvas id="chart-${stInfo.jmaCode}"></canvas></div>
+                        <div id="tooltip-${stInfo.jmaCode}" class="custom-tooltip"></div>
+                    </div>`;
+                grid.appendChild(box);
+
+                drawChart(stInfo, yyyy, yyyymmdd, mmdd);
+            }
+
+            setTimeout(updateScales, 100);
+            window.addEventListener('resize', updateScales);
+        } catch (e) {
+            console.error("初期化中にエラーが発生しました:", e);
+        }
+    }
+    async function drawChart(st, yyyy, yyyymmdd, mmdd) {
+        try {
+            const obsUrl = `https://www.jma.go.jp/bosai/tidelevel/data/tide/tide_obs_${yyyymmdd}_${st.jmaCode}.json`;
+            const astroUrl = `https://www.jma.go.jp/bosai/tidelevel/const/tide_astro/tide_astro_${yyyy}_${st.jmaCode}.json`;
+
+            const [obsRes, astroRes] = await Promise.all([
+                fetch(obsUrl).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch(astroUrl).then(r => r.ok ? r.json() : null).catch(() => null)
+            ]);
+
+            const now = new Date();
+            const baseHour = now.getHours();
+            const currentHourDecimal = now.getHours() + (now.getMinutes() / 60);
+            const margin = 1.7;
+            const xMinFixed = baseHour - 4 - margin - 0.62;
+            const xMaxFixed = baseHour + 5 + margin - 0.35;
+            const plotStart = baseHour - 5.5 - 0.51;
+            const plotEnd = xMaxFixed - 0.34;
+
+            const obsData = [];
+            const yValues = [];
+
+            if (obsRes && Array.isArray(obsRes.tide)) {
+                let itemsPerHour = 12;
+                const totalLength = obsRes.tide.length;
+                if (totalLength === 1440 || totalLength === 288 || totalLength === 96) {
+                    itemsPerHour = totalLength / 24;
+                } else if (currentHourDecimal > 0.5) {
+                    const estimated = Math.round(totalLength / currentHourDecimal);
+                    itemsPerHour = [60, 12, 4].find(n => Math.abs(estimated - n) < 5) || estimated;
+                }
+                const rawObsData = [];
+                obsRes.tide.forEach((v, i) => {
+                    const h = i / itemsPerHour;
+                    if (v !== null && v !== undefined && v !== -9999 && h >= plotStart -0.0 && h <= plotEnd -0.00) {
+                        rawObsData.push({ x: h, y: v });
+                    }
+                });
+                const windowSize = itemsPerHour >= 30 ? 4 : 2;
+                const halfWindow = Math.floor(windowSize / 2);
+                for (let i = 0; i < rawObsData.length; i++) {
+                    let sum = 0, count = 0;
+                    for (let j = Math.max(0, i - halfWindow); j <= Math.min(rawObsData.length - 1, i + halfWindow); j++) {
+                        sum += rawObsData[j].y; count++;
+                    }
+                    const smoothY = sum / count;
+                    obsData.push({ x: rawObsData[i].x, y: smoothY });
+                    yValues.push(smoothY);
+                }
+            }
+
+            const astroData = [];
+            const todayAstro = astroRes?.tide?.[mmdd];
+            if (todayAstro) {
+                todayAstro.forEach((v, i) => {
+                    if (v !== -9999 && i >= xMinFixed  && i <= xMaxFixed) { 
+                        astroData.push({ x: i, y: v }); yValues.push(v); 
+                    }
+                });
+            }
+            const tomorrow = new Date(now);
+            tomorrow.setDate(now.getDate() + 1);
+            const tomorrowMmdd = String(tomorrow.getMonth() + 1).padStart(2, '0') + String(tomorrow.getDate()).padStart(2, '0');
+            const tomorrowAstro = astroRes?.tide?.[tomorrowMmdd];
+            if (tomorrowAstro) {
+                tomorrowAstro.forEach((v, i) => {
+                    const h = i + 24;
+                    if (v !== -9999 && h >= xMinFixed && h <= xMaxFixed) { 
+                        astroData.push({ x: h, y: v }); yValues.push(v); 
+                    }
+                });
+            }
+
+            if (st.record !== null) yValues.push(st.record);
+            if (st.advisory !== null) yValues.push(st.advisory);
+            if (st.warning !== null) yValues.push(st.warning);
+
+            let yMin = -100, labelMax = 200, yMax = 230;
+            if (yValues.length > 0) {
+                const max = Math.max(...yValues);
+                const min = Math.min(...yValues);
+                labelMax = Math.ceil((max + 50) / 50) * 50;
+                yMax = labelMax + 30;
+                yMin = Math.min(-100, Math.floor(min / 100) * 100);
+            }
+
+            const annotations = {};
+            annotations.xAxisLine = { type: 'line', yMin: yMin, yMax: yMin, xMin: plotStart, xMax: plotEnd, borderColor: '#ffffff', borderWidth: 8 };
+            if (st.record !== null) annotations.l1 = { type: 'line', yMin: st.record, yMax: st.record, xMin: plotStart, xMax: plotEnd, borderColor: '#b103e1', borderWidth: 8, borderDash: [15, 10] };
+            if (st.advisory !== null) annotations.l2 = { type: 'line', yMin: st.advisory, yMax: st.advisory, xMin: plotStart, xMax: plotEnd, borderColor: '#f6f10d', borderWidth: 8 };
+            if (st.warning !== null) annotations.l3 = { type: 'line', yMin: st.warning, yMax: st.warning, xMin: plotStart, xMax: plotEnd, borderColor: '#d50200', borderWidth: 8 };
+
+            const ctx = document.getElementById(`chart-${st.jmaCode}`);
+            if(!ctx) return;
+
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                   datasets: [
+                            { label: '実況', data: obsData, borderColor: '#46ecf1', borderWidth: 8, pointRadius: 0, pointHitRadius: 0, fill: false, tension: 0.4, cubicInterpolationMode: 'monotone', borderCapStyle: 'round', borderJoinStyle: 'round' },
+                            { label: '天文', data: astroData, borderColor: '#00c602', borderWidth: 8, pointRadius: 0, pointHitRadius: 0, fill: false, tension: 0.4, cubicInterpolationMode: 'monotone' }
+                        ]
+                },
+                options: {
+                    devicePixelRatio: 2,
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    layout: { padding: { bottom: 250 } },
+                    plugins: { legend: { display: false }, annotation: { annotations }, tooltip: { enabled: false } },
+                    onHover: (event, chartElement, chart) => {
+                        const container = chart.canvas.closest('.graph-box');
+                        if (!container || !container.classList.contains('expanded') || isAnimating) {
+                            const tooltipEl = document.getElementById(`tooltip-${st.jmaCode}`);
+                            if (tooltipEl) {
+                                tooltipEl.style.display = 'none';
+                                tooltipEl.classList.remove('show');
+                            }
+                            return;
+                        }
+
+                        const tooltipEl = document.getElementById(`tooltip-${st.jmaCode}`);
+                        if (!tooltipEl) return;
+
+                        const { left, right, top, bottom } = chart.chartArea;
+                        const isInside = event.x >= (left + 82) && event.x <= (right - 90) && event.y >= top && event.y <= (bottom - 15);
+
+                        if (!isInside) {
+                            tooltipEl.style.display = 'none';
+                            tooltipEl.classList.remove('show');
+                            chart.draw(); 
+                            return;
+                        }
+
+                        const timeVal = chart.scales.x.getValueForPixel(event.x);
+
+                        const getValOnLine = (datasetIndex) => {
+                            const dataset = chart.data.datasets[datasetIndex].data;
+                            if (!dataset || dataset.length === 0) return null;
+                            if (timeVal < dataset[0].x || timeVal > dataset[dataset.length - 1].x) return null;
+
+                            let prev = dataset[0], next = dataset[dataset.length - 1];
+                            for (let i = 0; i < dataset.length - 1; i++) {
+                                if (dataset[i].x <= timeVal && dataset[i + 1].x >= timeVal) {
+                                    prev = dataset[i];
+                                    next = dataset[i + 1];
+                                    break;
+                                }
+                            }
+                            const t = (timeVal - prev.x) / (next.x - prev.x);
+                            return prev.y + t * (next.y - prev.y);
+                        };
+
+                        const obsValAtLine = getValOnLine(0);   
+                        const astroValAtLine = getValOnLine(1); 
+
+                        let rows = [];
+                        if (st.warning !== null) rows.push({ val: st.warning, html: `<div class="tooltip-row"><div class="tooltip-color-box" style="background:#d50200;"></div>高潮警報基準</div><div class="tooltip-value-container"><span class="tooltip-value">${st.warning}</span><span class="tooltip-unit">cm</span></div>` });
+                        if (st.record !== null) rows.push({ val: st.record, html: `<div class="tooltip-row"><div class="tooltip-color-box dashed"></div>過去最高</div><div class="tooltip-value-container"><span class="tooltip-value">${st.record}</span><span class="tooltip-unit">cm</span></div>` });
+                        if (st.advisory !== null) rows.push({ val: st.advisory, html: `<div class="tooltip-row"><div class="tooltip-color-box" style="background:#f6f10d;"></div>高潮注意報基準</div><div class="tooltip-value-container"><span class="tooltip-value">${st.advisory}</span><span class="tooltip-unit">cm</span></div>` });
+                        
+                        if (astroValAtLine !== null) {
+                            rows.push({ val: Math.round(astroValAtLine), html: `<div class="tooltip-row"><div class="tooltip-color-box" style="background:#00c602;"></div>天文潮位</div><div class="tooltip-value-container"><span class="tooltip-value">${Math.round(astroValAtLine)}</span><span class="tooltip-unit">cm</span></div>` });
+                        }
+                        
+                        if (obsValAtLine !== null) {
+                            rows.push({ val: Math.round(obsValAtLine), html: `<div class="tooltip-row"><div class="tooltip-color-box" style="background:#46ecf1;"></div>潮位</div><div class="tooltip-value-container"><span class="tooltip-value">${Math.round(obsValAtLine)}</span><span class="tooltip-unit">cm</span></div>` });
+                        }
+                        
+                        const targetDate = new Date();
+                        targetDate.setHours(0, 0, 0, 0); 
+                        targetDate.setTime(targetDate.getTime() + (timeVal * 60 * 60 * 1000));
+                        const timeStr = `${targetDate.getMonth() + 1}月${targetDate.getDate()}日${targetDate.getHours()}時${String(targetDate.getMinutes()).padStart(2, '0')}分`;
+                        
+                        rows.sort((a, b) => b.val - a.val);
+                        tooltipEl.innerHTML = `<div class="tooltip-time">${timeStr}</div>` + rows.map(r => r.html).join('');
+                        tooltipEl.style.display = 'block';
+                        tooltipEl.classList.add('show');
+
+                        tooltipEl.style.left = (event.x + 275) + 'px'; 
+                        tooltipEl.style.top = '655px';
+
+                        chart.draw();
+                        const { ctx } = chart;
+                        ctx.save();
+                        
+                        ctx.beginPath(); ctx.lineWidth = 8; ctx.strokeStyle = '#ffffff'; 
+                        ctx.moveTo(event.x, top); ctx.lineTo(event.x, bottom); ctx.stroke();
+
+                        const drawCircle = (val, color, forceDisplay = false) => {
+                            if (val === null || isNaN(val)) return;
+                            const yPixel = chart.scales.y.getPixelForValue(val);
+                            if (!forceDisplay && (yPixel < top || yPixel > bottom)) return; 
+                            ctx.beginPath(); ctx.arc(event.x, yPixel, 18, 0, Math.PI * 2);
+                            ctx.fillStyle = '#ffffff'; ctx.fill();
+                            ctx.beginPath(); ctx.arc(event.x, yPixel, 12, 0, Math.PI * 2);
+                            ctx.fillStyle = color; ctx.fill();
+                        };
+
+                        drawCircle(obsValAtLine, '#46ecf1', false);
+                        drawCircle(astroValAtLine, '#00c602', false);
+                        if (st.warning !== null) drawCircle(st.warning, '#d50200', true);
+                        if (st.record !== null) drawCircle(st.record, '#b103e1', true);
+                        if (st.advisory !== null) drawCircle(st.advisory, '#f6f10d', true);
+                        
+                        ctx.restore();
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: xMinFixed,
+                            max: xMaxFixed,
+                            offset: false,
+                            afterFit: function(axis) {
+                                axis.paddingLeft = 0;
+                                axis.paddingRight = 0;
+                            },
+                                                    grid: { color: 'rgba(255,255,255,0.1)', lineWidth: 8, drawTicks: true, tickColor: '#ffffff', tickLength: 30, tickWidth: 8 }, 
+                            border: { display: true, color: '#ffffff', width: 8, dash: [15, 15], drawOnChartArea: true, hideOnEnd: true, z: 1 }, 
+                            ticks: { 
+                                color: '#ffffff', 
+                                font: { size: 70, family: CONFIG.fontName, weight: 'normal' }, 
+                                stepSize: 1, padding: 25, includeBounds: false,
+                                callback: function(v, index, ticks) {
+                                    if (Math.abs(v - Math.round(v)) > 0.05) return '';
+                                    let hour = Math.round(v);
+                                    
+                                    const dateObj = new Date(now);
+                                    dateObj.setHours(hour, 0, 0, 0);
+                                    const d = dateObj.getDate();
+                                    
+                                    let displayHour = hour;
+                                    while (displayHour < 0) displayHour += 24;
+                                    while (displayHour >= 24) displayHour -= 24;
+
+                                    if (index === 0 || displayHour === 0) {
+                                        return [displayHour + '時', d + '日'];
+                                    }
+                                    
+                                    return displayHour + '時';
+                                }
+                            }
+                        },
+                        y: { 
+                            min: yMin, max: yMax, 
+                            afterFit: function(axis) {
+                                axis.width = 250;
+                            },
+                            grid: { color: 'rgba(255,255,255,0.15)', lineWidth: 8, drawTicks: true, tickColor: '#ffffff', tickLength: 20, tickWidth: 8 }, 
+                            border: { display: true, color: '#ffffff', width: 8, z: 1 }, 
+                            ticks: { color: '#ffffff', font: { size: 70, family: CONFIG.fontName }, stepSize: 100, padding: 20, callback: function(value) { return value > labelMax ? null : value; } }
+                        }
+                    }
+                }
+            });
+
+            ctx.addEventListener('mouseleave', () => {
+                const tooltipEl = document.getElementById(`tooltip-${st.jmaCode}`);
+                if (tooltipEl) { tooltipEl.style.display = 'none'; tooltipEl.classList.remove('show'); }
+                chart.draw();
+            });
+
+        } catch (e) { console.warn(e); }
+    }
+    document.fonts.ready.then(function() {
+    init();
+});
+</script>
+</body>
+</html>
