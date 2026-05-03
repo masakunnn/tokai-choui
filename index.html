@@ -639,7 +639,7 @@
                     let itemsPerHour = res.tide.length / 24;
                     res.tide.forEach((v, i) => {
                         const h = (i / itemsPerHour) + offset;
-                        if (v !== null && v !== undefined && v !== -9999 && h >= plotStart - 1 && h <= plotEnd + 1) {
+                        if (v !== null && v !== undefined && v !== -9999 && h >= plotStart - 0 && h <= plotEnd + 0) {
                             obsData.push({ x: h, y: v });
                             yValues.push(v);
                         }
@@ -662,7 +662,7 @@
                 if (dayAstro) {
                     dayAstro.forEach((v, i) => {
                         const h = i + offset;
-                        if (v !== -9999 && h >= xMinFixed - 1 && h <= xMaxFixed + 1) {
+                        if (v !== -9999 && h >= xMinFixed - 0 && h <= xMaxFixed + 0) {
                             astroData.push({ x: h, y: v });
                             yValues.push(v);
                         }
