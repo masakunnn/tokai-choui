@@ -541,10 +541,14 @@
             
                     for (const found of class30.stations) {
                         let rawAgency = found.typeName || class30.typeName || "";
+
+                        // カッコとその中身だけを削除（カッコがない機関はそのまま残る）
+                        rawAgency = rawAgency.replace(/[（\(].*?[）\)]/g, "");
+
                         let agencyName = (rawAgency === "" || rawAgency === "気象庁")
                             ? "気象庁"
                             : `気象庁・${rawAgency}`;
-            
+
                         stationsToRender.push({
                             name: found.name,
                             jmaCode: found.code,
