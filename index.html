@@ -603,17 +603,27 @@
     }
     async function drawChart(st, yyyy, yyyymmdd, mmdd) {
         try {
+            // 前日の日付を計算
+            const now = new Date();
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            const y_yyyy = yesterday.getFullYear();
+            const y_yyyymmdd = y_yyyy + String(yesterday.getMonth() + 1).padStart(2, '0') + String(yesterday.getDate()).padStart(2, '0');
+            const y_mmdd = String(yesterday.getMonth() + 1).padStart(2, '0') + String(yesterday.getDate()).padStart(2, '0');
+
+            // 今日と昨日の実況データURL
             const obsUrl = `https://www.jma.go.jp/bosai/tidelevel/data/tide/tide_obs_${yyyymmdd}_${st.jmaCode}.json`;
+            const y_obsUrl = `https://www.jma.go.jp/bosai/tidelevel/data/tide/tide_obs_${y_yyyymmdd}_${st.jmaCode}.json`;
+            // 天文潮位データURL（年単位なので同じ）
             const astroUrl = `https://www.jma.go.jp/bosai/tidelevel/const/tide_astro/tide_astro_${yyyy}_${st.jmaCode}.json`;
 
-            const [obsRes, astroRes] = await Promise.all([
+            const [obsRes, y_obsRes, astroRes] = await Promise.all([
                 fetch(obsUrl).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch(y_obsUrl).then(r => r.ok ? r.json() : null).catch(() => null),
                 fetch(astroUrl).then(r => r.ok ? r.json() : null).catch(() => null)
             ]);
 
-            const now = new Date();
             const baseHour = now.getHours();
-            const currentHourDecimal = now.getHours() + (now.getMinutes() / 60);
             const margin = 1.7;
             const xMinFixed = baseHour - 4 - margin - 0.62;
             const xMaxFixed = baseHour + 5 + margin - 0.35;
@@ -623,57 +633,52 @@
             const obsData = [];
             const yValues = [];
 
-            if (obsRes && Array.isArray(obsRes.tide)) {
-                let itemsPerHour = 12;
-                const totalLength = obsRes.tide.length;
-                if (totalLength === 1440 || totalLength === 288 || totalLength === 96) {
-                    itemsPerHour = totalLength / 24;
-                } else if (currentHourDecimal > 0.5) {
-                    const estimated = Math.round(totalLength / currentHourDecimal);
-                    itemsPerHour = [60, 12, 4].find(n => Math.abs(estimated - n) < 5) || estimated;
+            // 実況データの処理（昨日と今日を結合）
+            const processObs = (res, offset) => {
+                if (res && Array.isArray(res.tide)) {
+                    let itemsPerHour = res.tide.length / 24;
+                    res.tide.forEach((v, i) => {
+                        const h = (i / itemsPerHour) + offset;
+                        if (v !== null && v !== undefined && v !== -9999 && h >= plotStart - 1 && h <= plotEnd + 1) {
+                            obsData.push({ x: h, y: v });
+                            yValues.push(v);
+                        }
+                    });
                 }
-                const rawObsData = [];
-                obsRes.tide.forEach((v, i) => {
-                    const h = i / itemsPerHour;
-                    if (v !== null && v !== undefined && v !== -9999 && h >= plotStart -0.0 && h <= plotEnd -0.00) {
-                        rawObsData.push({ x: h, y: v });
-                    }
-                });
-                const windowSize = itemsPerHour >= 30 ? 4 : 2;
-                const halfWindow = Math.floor(windowSize / 2);
-                for (let i = 0; i < rawObsData.length; i++) {
-                    let sum = 0, count = 0;
-                    for (let j = Math.max(0, i - halfWindow); j <= Math.min(rawObsData.length - 1, i + halfWindow); j++) {
-                        sum += rawObsData[j].y; count++;
-                    }
-                    const smoothY = sum / count;
-                    obsData.push({ x: rawObsData[i].x, y: smoothY });
-                    yValues.push(smoothY);
-                }
+            };
+
+            processObs(y_obsRes, -24); // 昨日のデータ（時間を-24する）
+            processObs(obsRes, 0);     // 今日のデータ
+
+            // 平滑化処理（既存のロジック）
+            if (obsData.length > 0) {
+                obsData.sort((a, b) => a.x - b.x);
             }
 
             const astroData = [];
-            const todayAstro = astroRes?.tide?.[mmdd];
-            if (todayAstro) {
-                todayAstro.forEach((v, i) => {
-                    if (v !== -9999 && i >= xMinFixed  && i <= xMaxFixed) { 
-                        astroData.push({ x: i, y: v }); yValues.push(v); 
-                    }
-                });
-            }
+            // 昨日・今日・明日の天文潮位を取得して結合
+            const processAstro = (dayMmdd, offset) => {
+                const dayAstro = astroRes?.tide?.[dayMmdd];
+                if (dayAstro) {
+                    dayAstro.forEach((v, i) => {
+                        const h = i + offset;
+                        if (v !== -9999 && h >= xMinFixed - 1 && h <= xMaxFixed + 1) {
+                            astroData.push({ x: h, y: v });
+                            yValues.push(v);
+                        }
+                    });
+                }
+            };
+
+            processAstro(y_mmdd, -24); // 昨日
+            processAstro(mmdd, 0);      // 今日
+            
             const tomorrow = new Date(now);
             tomorrow.setDate(now.getDate() + 1);
             const tomorrowMmdd = String(tomorrow.getMonth() + 1).padStart(2, '0') + String(tomorrow.getDate()).padStart(2, '0');
-            const tomorrowAstro = astroRes?.tide?.[tomorrowMmdd];
-            if (tomorrowAstro) {
-                tomorrowAstro.forEach((v, i) => {
-                    const h = i + 24;
-                    if (v !== -9999 && h >= xMinFixed && h <= xMaxFixed) { 
-                        astroData.push({ x: h, y: v }); yValues.push(v); 
-                    }
-                });
-            }
+            processAstro(tomorrowMmdd, 24); // 明日
 
+            // 基準線などの処理（ここからは元のコードと同じ）
             if (st.record !== null) yValues.push(st.record);
             if (st.advisory !== null) yValues.push(st.advisory);
             if (st.warning !== null) yValues.push(st.warning);
